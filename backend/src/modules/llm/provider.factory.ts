@@ -1,6 +1,7 @@
 import { config } from "@/config";
 import { LLMProvider } from "@/modules/llm/providers/types";
 import { OpenAIProvider } from "@/modules/llm/providers/openai.provider";
+import { OllamaProvider } from "@/modules/llm/providers/ollama.provider";
 import { MockProvider } from "@/modules/llm/providers/mock.provider";
 
 let cached: LLMProvider | null = null;
@@ -17,6 +18,9 @@ export function getLLMProvider(): LLMProvider {
   switch (config.llm.provider) {
     case "openai":
       cached = new OpenAIProvider();
+      break;
+    case "ollama":
+      cached = new OllamaProvider();
       break;
     case "mock":
     default:

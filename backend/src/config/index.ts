@@ -22,9 +22,17 @@ export const config = {
   },
 
   llm: {
-    provider: (process.env.LLM_PROVIDER ?? "mock") as "openai" | "mock",
+    provider: (process.env.LLM_PROVIDER ?? "mock") as
+      | "openai"
+      | "ollama"
+      | "mock",
     openaiApiKey: process.env.OPENAI_API_KEY ?? "",
     openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+    // Ollama: free, local inference — no API key, no per-token cost.
+    // See providers/ollama.provider.ts for the embedding-dimension note.
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434",
+    ollamaChatModel: process.env.OLLAMA_CHAT_MODEL ?? "llama3.2:1b",
+    ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL ?? "nomic-embed-text",
   },
 
   rateLimit: {
