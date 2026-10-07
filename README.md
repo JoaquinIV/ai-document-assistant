@@ -19,8 +19,9 @@ classification or structured extraction would each only exercise a subset of tha
                       │  documents.service → chunk → embed → store   │
                       │  chat.routes → sanitize → retrieve → prompt  │      ┌────────────┐
                       │    → provider.complete → post-process        │─────▶│ LLM        │
-                      └──────────────────────────────────────────────┘      │ (OpenAI or │
-                                                                             │  mock)     │
+                      └──────────────────────────────────────────────┘      │ (OpenAI,   │
+                                                                             │  Ollama,   │
+                                                                             │  or mock)  │
                                                                              └────────────┘
 ```
 
@@ -59,13 +60,26 @@ docker-compose.yml   Postgres (pgvector) + backend, for local/stack-level runs
 | Persistence (PostgreSQL) | `backend/src/db/migrate.ts`, `pool.ts` |
 | Auth (JWT) | `modules/auth`, `middleware/auth.middleware.ts` |
 | Prompt construction / model invocation / post-processing, separated | `modules/llm/prompt.ts` / `provider.factory.ts` + `providers/*` / `postprocess.ts` |
-| Switchable LLM provider | `LLMProvider` interface (`providers/types.ts`) with `OpenAIProvider` and `MockProvider`, selected by `LLM_PROVIDER` env var — zero code changes to switch |
+| Switchable LLM provider | `LLMProvider` interface (`providers/types.ts`) with three real implementations — `OpenAIProvider`, `OllamaProvider`, `MockProvider` — selected by `LLM_PROVIDER` env var, zero code changes to switch |
 | Prompt versioning | `QA_PROMPT_VERSION` constant in `prompt.ts`, stored per message in `chat_messages.prompt_version` |
 
 `chat.routes.ts`'s `/ask` handler is written so each of the six stages
 (sanitize → retrieve → build prompt → invoke model → post-process → persist) is a
 distinct, visible step — not folded into one opaque `askAI()` call — so each can be
 tested, swapped, or audited independently.
+
+**Three providers, not just one mocked one.** Beyond the OpenAI provider and the
+mock, `OllamaProvider` (`providers/ollama.provider.ts`) runs real inference fully
+locally via [Ollama](https://ollama.com) — no API key, no per-token cost — useful for
+running this end-to-end with genuine (if smaller) model output at zero cost. It
+surfaces one real engineering problem worth calling out: `document_chunks.embedding`
+is a fixed `vector(1536)` column sized for OpenAI's embedding model, but Ollama's
+embedding models output fewer dimensions (e.g. 384–768). Rather than branch the
+schema per provider, `OllamaProvider.embed()` right-pads the vector with zeros to
+1536. This is exact, not approximate, for cosine similarity: padding with zeros
+changes neither the dot product nor the vector norm, so pgvector's `<=>` operator
+returns identical similarity rankings — it only requires that every embedding in a
+given deployment is padded the same way, which it is.
 
 #### How prompt injection / unsafe input is handled
 
@@ -377,6 +391,22 @@ To use real OpenAI completions instead:
 ```bash
 LLM_PROVIDER=openai OPENAI_API_KEY=sk-... docker compose up --build
 ```
+
+To use real (local, free) completions via Ollama instead — no API key needed:
+```bash
+# one-time: install Ollama, then pull a small model for each role
+ollama pull qwen2.5:0.5b      # chat — or llama3.2:1b for better quality
+ollama pull all-minilm        # embeddings — or nomic-embed-text for better quality
+
+OLLAMA_CHAT_MODEL=qwen2.5:0.5b OLLAMA_EMBED_MODEL=all-minilm \
+  LLM_PROVIDER=ollama docker compose up --build
+```
+Since Ollama runs on the host, not inside the container, `OLLAMA_BASE_URL` defaults to
+`http://localhost:11434` — fine when running the backend directly with `npm run dev`
+(below), but a containerized backend needs that host reachable as
+`http://host.docker.internal:11434` on Linux (add
+`extra_hosts: ["host.docker.internal:host-gateway"]` to the `backend` service in
+`docker-compose.yml`) or it already works out of the box on Docker Desktop (Mac/Windows).
 
 ### Backend only, without Docker
 
