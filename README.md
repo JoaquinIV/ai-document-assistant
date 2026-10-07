@@ -394,19 +394,19 @@ LLM_PROVIDER=openai OPENAI_API_KEY=sk-... docker compose up --build
 
 To use real (local, free) completions via Ollama instead — no API key needed:
 ```bash
-# one-time: install Ollama, then pull a small model for each role
-ollama pull qwen2.5:0.5b      # chat — or llama3.2:1b for better quality
-ollama pull all-minilm        # embeddings — or nomic-embed-text for better quality
+# one-time: install Ollama (https://ollama.com), then pull a model for each role.
+# Pick based on your machine's RAM/CPU — these run roughly lightest to heaviest:
+ollama pull qwen2.5:0.5b      # chat, ~350MB — or llama3.2:1b (~1.3GB) for better quality
+ollama pull all-minilm        # embeddings, ~45MB — or nomic-embed-text (~270MB) for better quality
 
 OLLAMA_CHAT_MODEL=qwen2.5:0.5b OLLAMA_EMBED_MODEL=all-minilm \
   LLM_PROVIDER=ollama docker compose up --build
 ```
-Since Ollama runs on the host, not inside the container, `OLLAMA_BASE_URL` defaults to
-`http://localhost:11434` — fine when running the backend directly with `npm run dev`
-(below), but a containerized backend needs that host reachable as
-`http://host.docker.internal:11434` on Linux (add
-`extra_hosts: ["host.docker.internal:host-gateway"]` to the `backend` service in
-`docker-compose.yml`) or it already works out of the box on Docker Desktop (Mac/Windows).
+Ollama runs on the host, not inside the container; `docker-compose.yml` already points
+the backend at it via `host.docker.internal` (with the `extra_hosts` entry Linux needs
+to resolve that name — Docker Desktop on Mac/Windows supports it natively). Running the
+backend directly with `npm run dev` instead (below) talks to Ollama over plain
+`localhost`, no extra config needed.
 
 ### Backend only, without Docker
 
